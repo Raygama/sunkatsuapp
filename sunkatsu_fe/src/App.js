@@ -12,17 +12,16 @@ import MenuCustomer from "./components/Pages/Menu/menuCustomer";
 import MenuStaff from "./components/Pages/Menu/menuStaff";
 import MenuOwner from "./components/Pages/Menu/menuOwner";
 import Payment from "./components/Pages/Dashboard/payment";
-import PaymentDone from "./components/Pages/Dashboard/paymentDone";
 
-import Chat from "./components/Pages/Dashboard/chat";
-import TestPage from "./components/Pages/Dashboard/testpage";
 import Menu from "./components/Pages/Menu/menu";
-import LandingPage from "./components/Pages/Home/home";
 import Cart from "./components/Pages/Dashboard/cart";
 import Order from "./components/Pages/Dashboard/myorder";
 import Profile from "./components/Pages/Dashboard/userProfile";
 import Signup from "./components/Pages/Register/signup";
-import Chatbot from "./components/Pages/Dashboard/stream";
+import ChatPage from "./components/Pages/Chat/ChatPage";
+import ChatbotPage from "./components/Pages/Chatbot/ChatbotPage";
+
+import OwnerDashboard from "./components/Pages/Dashboard/ownerDashboard";
 
 function App() {
   return (
@@ -38,6 +37,23 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            <Route
+              path="/chat_page"
+              element={
+                <ProtectedRoute requiresAuth={true}>
+                  <ChatPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chatbot_page"
+              element={
+                <ProtectedRoute requiresAuth={true}>
+                  <ChatbotPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/login"
               element={
@@ -50,24 +66,15 @@ function App() {
             <Route path="/menuCustomer" element={<MenuCustomer />} />
             <Route path="/menuStaff" element={<MenuStaff />} />
             <Route path="/menuOwner" element={<MenuOwner />} />
+            <Route path="/dashboard" element={<OwnerDashboard />} />
             <Route
-              path="/chat"
+              path="/cart"
               element={
                 <ProtectedRoute requiresAuth={true}>
-                  <Chat />
+                  <Cart />
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/stream"
-              element={
-                <ProtectedRoute requiresAuth={true}>
-                  <Chatbot />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route path="/cart" element={<Cart />} />
             <Route
               path="/menu"
               element={

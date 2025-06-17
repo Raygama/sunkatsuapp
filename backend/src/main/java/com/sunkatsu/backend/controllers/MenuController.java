@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -98,7 +99,7 @@ public class MenuController {
 
         // Validasi file: ukuran
         long fileSizeInBytes = file.getSize();
-        long maxFileSizeInBytes = 10 * 1024 * 1024; // 5 MB
+        long maxFileSizeInBytes = 10 * 1024 * 1024; // 10 MB
         if (fileSizeInBytes > maxFileSizeInBytes) {
             return ResponseEntity.badRequest().body(new Message("Error : Ukuran file terlalu besar, maksimal 10 MB"));
         }
@@ -224,6 +225,4 @@ public class MenuController {
                             .header("Content-Type", contentType != null ? contentType : "application/octet-stream")
                             .body(image);
     }
-
-
 }

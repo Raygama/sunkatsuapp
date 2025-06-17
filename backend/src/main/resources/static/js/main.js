@@ -40,20 +40,139 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 1000); // 1000 ms = 1 detik
 });
 
-function connect(event) {
-  customerId = document.querySelector("#customerId").value.trim();
+document.addEventListener("DOMContentLoaded", async function () {
+  function getCookieValue(cookieName) {
+    const cookies = document.cookie.split("; ");
+    for (let i = 0; i < cookies.length; i++) {
+      const [name, value] = cookies[i].split("=");
+      if (name === cookieName) {
+        return value;
+      }
+    }
+    return null;
+  }
 
-  if (customerId) {
-    customerIdPage.classList.add("hidden");
+  function parseJwt(token) {
+    if (!token) {
+      return null;
+    }
+    const payload = token.split(".")[1];
+    const decodedPayload = atob(payload);
+    return JSON.parse(decodedPayload);
+  }
+
+  // Auto connect function
+  async function autoConnect() {
+    const token = getCookieValue("token");
+    const decodedToken = parseJwt(token);
+
+    if (decodedToken && decodedToken.id) {
+      customerId = decodedToken.id; // Set customerId dari token
+
+      // Sembunyikan halaman login dan tampilkan chat
+      customerIdPage.classList.add("hidden");
+      chatPage.classList.remove("hidden");
+
+      // Buat koneksi WebSocket
+      const socket = new SockJS("/ws");
+      stompClient = Stomp.over(socket);
+
+      stompClient.connect({}, onConnected, onError);
+    } else {
+      console.error("Token tidak valid atau tidak ditemukan");
+      // Optional: redirect ke halaman login
+      // window.location.href = '/login';
+    }
+  }
+
+  // Jalankan auto connect
+  await autoConnect();
+
+  // Set interval untuk update daftar user dan chat
+  findAndDisplayConnectedUsers();
+  setInterval(findAndDisplayConnectedUsers, 5000);
+
+  setInterval(() => {
+    if (selectedUserId) {
+      fetchAndDisplayUserChat();
+    }
+  }, 1000);
+});
+
+function connect(userId = null) {
+  try {
+    // Jika userId tidak diberikan, ambil dari token
+    if (!userId) {
+      const token = getCookieValue("token");
+      const decodedToken = parseJwt(token);
+      if (!decodedToken || !decodedToken.id) {
+        throw new Error("Invalid token or user ID not found");
+      }
+      userId = decodedToken.id;
+    }
+
+    // Set customerId
+    customerId = userId;
+
+    // Tampilkan chat page
+    if (customerIdPage) {
+      customerIdPage.classList.add("hidden");
+    }
     chatPage.classList.remove("hidden");
 
+    // Buat koneksi WebSocket
     const socket = new SockJS("/ws");
     stompClient = Stomp.over(socket);
 
+    // Connect ke WebSocket server
     stompClient.connect({}, onConnected, onError);
+
+    return true;
+  } catch (error) {
+    console.error("Connection error:", error);
+    onError(error);
+    return false;
   }
-  event.preventDefault();
 }
+
+function getCookieValue(cookieName) {
+  const cookies = document.cookie.split("; ");
+  for (let i = 0; i < cookies.length; i++) {
+    const [name, value] = cookies[i].split("=");
+    if (name === cookieName) {
+      return value;
+    }
+  }
+  return null;
+}
+
+// Fungsi helper untuk parse JWT token
+function parseJwt(token) {
+  if (!token) {
+    return null;
+  }
+  const payload = token.split(".")[1];
+  const decodedPayload = atob(payload);
+  return JSON.parse(decodedPayload);
+}
+
+// Event listener untuk auto-connect saat halaman dimuat
+document.addEventListener("DOMContentLoaded", async function () {
+  // Coba connect otomatis
+  const connected = connect();
+
+  if (connected) {
+    // Set interval untuk update data
+    findAndDisplayConnectedUsers();
+    setInterval(findAndDisplayConnectedUsers, 5000);
+
+    setInterval(() => {
+      if (selectedUserId) {
+        fetchAndDisplayUserChat();
+      }
+    }, 1000);
+  }
+});
 
 function onConnected() {
   // Subscribe ke topik publik dan private untuk user tertentu
@@ -171,7 +290,7 @@ function userItemClick(userId) {
   fetchAndDisplayUserChat().then();
 }
 
-function displayMessage(senderId, content) {
+function displayMessage(senderId, content, imageUrl = null) {
   const messageContainer = document.createElement("div");
   messageContainer.classList.add("message");
 
@@ -181,30 +300,76 @@ function displayMessage(senderId, content) {
     messageContainer.classList.add("receiver");
   }
 
-  const message = document.createElement("p");
-  message.textContent = content;
-  messageContainer.appendChild(message);
-  chatArea.appendChild(messageContainer);
+  // Add text message if present
+  if (content) {
+    const message = document.createElement("p");
+    message.textContent = content;
+    messageContainer.appendChild(message);
+  }
 
-  // Auto-scroll
+  // Securely fetch and display image
+  if (imageUrl) {
+    fetchImageBlob(imageUrl)
+      .then((blobUrl) => {
+        const image = document.createElement("img");
+        image.src = blobUrl;
+        image.alt = "Image";
+        image.style.maxWidth = "200px";
+        image.style.borderRadius = "8px";
+        image.style.marginTop = "5px";
+        messageContainer.appendChild(image);
+        chatArea.scrollTop = chatArea.scrollHeight;
+      })
+      .catch((err) => {
+        console.error("Error loading chat image:", err);
+      });
+  }
+
+  chatArea.appendChild(messageContainer);
   chatArea.scrollTop = chatArea.scrollHeight;
 }
 
+async function fetchImageBlob(imageUrl) {
+  const token = getToken(); 
+  const baseURL = "http://localhost:8080"; 
+
+  const fullUrl = baseURL + imageUrl;
+
+  const response = await fetch(fullUrl, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Image fetch failed");
+  }
+
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+}
+
+
+const renderedMessageIds = new Set();
+
 async function fetchAndDisplayUserChat() {
   try {
-    const userChatResponse = await fetch(
-      `/messages/${customerId}/${selectedUserId}`
-    );
-    if (!userChatResponse.ok) {
-      throw new Error(`Failed to fetch chats: ${userChatResponse.status}`);
+    const response = await fetch(`/messages/${customerId}/${selectedUserId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch chats: ${response.status}`);
     }
 
-    const userChat = await userChatResponse.json();
+    const userChat = await response.json();
 
-    chatArea.innerHTML = "";
+    // Only render messages that haven't been rendered before
     userChat.forEach((chat) => {
-      displayMessage(chat.senderId, chat.content);
+      if (!renderedMessageIds.has(chat.id)) {
+        displayMessage(chat.senderId, chat.content, chat.imageUrl);
+        renderedMessageIds.add(chat.id);
+      }
     });
+
     chatArea.scrollTop = chatArea.scrollHeight;
   } catch (error) {
     console.error("Error fetching user chat:", error);
@@ -217,26 +382,62 @@ function onError() {
   connectingElement.style.color = "red";
 }
 
-function sendMessage(event) {
-  const messageContent = messageInput.value.trim();
-  if (messageContent && stompClient && selectedUserId) {
-    const chatMessage = {
-      senderId: customerId,
-      recipientId: selectedUserId, // Pastikan recipient ID diisi
-      content: messageContent,
-      timestamp: new Date(),
-    };
 
-    // Kirim pesan ke endpoint '/app/chat'
-    stompClient.send("/app/chat", {}, JSON.stringify(chatMessage));
-
-    // Tampilkan pesan di layar pengirim
-    displayMessage(customerId, messageContent);
-    messageInput.value = "";
-  }
-  chatArea.scrollTop = chatArea.scrollHeight;
-  event.preventDefault();
+function getToken() {
+  return getCookieValue("token"); // assuming the JWT is stored as a cookie
 }
+
+async function sendMessage(event) {
+  event.preventDefault();
+
+  const messageContent = messageInput.value.trim();
+  const imageFile = document.querySelector("#imageInput").files[0];
+
+  let imageUrl = null;
+
+  if (imageFile) {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+
+    const token = getToken();
+
+    try {
+      const uploadResponse = await fetch("/api/files/upload", {
+        method: "POST",
+        body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (uploadResponse.ok) {
+        imageUrl = await uploadResponse.text();
+      } else {
+        console.error("Failed to upload image");
+        return;
+      }
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      return;
+    }
+  }
+
+  if ((!messageContent && !imageUrl) || !selectedUserId) return;
+
+  const chatMessage = {
+    senderId: customerId,
+    recipientId: selectedUserId,
+    content: messageContent || null,
+    imageUrl: imageUrl || null,
+    timestamp: new Date(),
+  };
+
+  stompClient.send("/app/chat", {}, JSON.stringify(chatMessage));
+
+  messageInput.value = "";
+  document.querySelector("#imageInput").value = "";
+}
+
 
 async function onMessageReceived(payload) {
   console.log("Message received", payload);
@@ -299,15 +500,15 @@ function displayOnlineUsers(users) {
 }
 
 function onLogout() {
-  stompClient.send(
-    "/app/customer.disconnectCustomer",
-    {},
-    JSON.stringify({ customerId: customerId })
-  );
-  window.location.reload();
+  // stompClient.send(
+  //   "/app/customer.disconnectCustomer",
+  //   {},
+  //   JSON.stringify({ customerId: customerId })
+  // );
+  window.location.href = "http://localhost:3000/menu";
 }
 
-customerIdForm.addEventListener("submit", connect, true);
+// customerIdForm.addEventListener("submit", connect, true);
 messageForm.addEventListener("submit", sendMessage, true);
 logout.addEventListener("click", onLogout, true);
 window.onbeforeunload = () => onLogout();

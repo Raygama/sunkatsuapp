@@ -20,6 +20,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.config.Customizer;
 
 @Configuration
 @EnableWebSecurity
@@ -61,15 +62,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(Customizer.withDefaults())
                 .csrf(customizer -> customizer.disable())
                 .authorizeHttpRequests(req ->
                         req.requestMatchers(WHITE_LIST_URL)
                                 .permitAll()
-                                .requestMatchers(POST, "/api/menus/some-secure-action/**").hasAnyAuthority(Permission.OWNER_CREATE.name())
                                 .requestMatchers("/api/staff/** ").hasAnyAuthority("STAFF", "OWNER")
                                 .requestMatchers("/api/owner/**").hasAuthority("OWNER")
 
-                                .requestMatchers(GET, "/api/customers").hasAuthority("OWNER")
+                                .requestMatchers(GET, "/api/customers/**").hasAnyAuthority("OWNER", "STAFF", "CUSTOMER")
                                 .requestMatchers(POST, "/api/customers").hasAuthority("OWNER")
 
                                 .requestMatchers(DELETE, "/api/favorites/**").hasAuthority("OWNER")
@@ -89,6 +90,16 @@ public class SecurityConfig {
                                 .requestMatchers(POST, "/api/menus/**").hasAuthority("OWNER")
                                 .requestMatchers(PATCH, "/api/menus/**").hasAuthority("OWNER")
                                 .requestMatchers(DELETE, "/api/menus/**").hasAuthority("OWNER")
+
+                                .requestMatchers(GET, "/api/files/**").hasAnyAuthority("CUSTOMER", "STAFF", "OWNER")
+                                .requestMatchers(POST, "/api/files/**").hasAnyAuthority("CUSTOMER", "STAFF", "OWNER")
+                                .requestMatchers(DELETE, "/api/files/**").hasAnyAuthority("CUSTOMER", "STAFF", "OWNER")
+                                .requestMatchers(PATCH, "/api/files/**").hasAnyAuthority("CUSTOMER", "STAFF", "OWNER")
+                                .requestMatchers("/api/files/images/**").permitAll()
+
+                                .requestMatchers(PUT, "/messages/**").hasAnyAuthority("CUSTOMER", "STAFF", "OWNER")
+                                .requestMatchers(DELETE, "/messages/**").hasAnyAuthority("CUSTOMER", "STAFF", "OWNER")
+                                
 
                                 .anyRequest()
                                 .authenticated()

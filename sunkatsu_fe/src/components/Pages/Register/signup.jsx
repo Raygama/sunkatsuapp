@@ -9,7 +9,7 @@ const Signup = () => {
     id: "string",
     username: "",
     password: "",
-    role: "STAFF",
+    role: "CUSTOMER",
     status: "ONLINE",
   });
 
@@ -111,7 +111,10 @@ const Signup = () => {
                   onChange={handleTogglePassword}
                   className="w-4 h-4 border-gray-300 rounded"
                 />
-                <label htmlFor="show-password" className="ml-2 text-sm text-black">
+                <label
+                  htmlFor="show-password"
+                  className="ml-2 text-sm text-black"
+                >
                   Show Password
                 </label>
               </div>
